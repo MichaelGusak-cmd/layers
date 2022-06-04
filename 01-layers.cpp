@@ -41,6 +41,17 @@ bool gRenderQuad = true;
 
 SDL_Rect PlayerRect;
 
+const int worldWidth = 11;
+const int worldHeight = 7;
+const int worldScale = 50;
+const float worldxPos = 20;
+const float worldyPos = 20;
+SDL_Rect world[worldWidth][worldHeight]; //make 3d later for more layers
+
+Uint64 NOW = SDL_GetPerformanceCounter();
+Uint64 LAST = 0;
+float deltaTime = 0;
+
 bool init() {
 	//Initialization flag
 	bool success = true;
@@ -117,19 +128,15 @@ void handleKeys(unsigned char key, int x, int y, bool down) {
 	}
 	else if (key == 'w') {
 		movement = UP;
-		//PlayerRect.y -= scale;
 	}
 	else if (key == 's') {
 		movement = DOWN;
-		//PlayerRect.y += scale;
 	}
 	else if (key == 'a') {
 		movement = LEFT;
-		//PlayerRect.x -= scale;
 	}
 	else if (key == 'd') {
 		movement = RIGHT;
-		//PlayerRect.x += scale;
 	}
 	if (movement >= 0) {
 		if (!keys[movement] && down) keys[movement] = true;
@@ -156,8 +163,10 @@ bool boxCollision(SDL_Rect* source, SDL_Rect* target) {
 #define POSITION 0
 #define VELOCITY 1
 
+
+
 void update() {
-	float speed = 0.05f;
+	float speed = 0.05f*deltaTime;
 	float xPos = xVal[POSITION], yPos = yVal[POSITION];
 
 	if (keys[0]) {
@@ -173,8 +182,9 @@ void update() {
 		xVal[VELOCITY] += speed;
 	}
 
-	xVal[VELOCITY] *= 0.9f;
-	yVal[VELOCITY] *= 0.9f;
+	float dampening = 0.8f;
+	xVal[VELOCITY] *= dampening;
+	yVal[VELOCITY] *= dampening;
 
 	xVal[POSITION] += xVal[VELOCITY]; //* deltaTime;
 	yVal[POSITION] += yVal[VELOCITY]; //* deltaTime;
@@ -204,6 +214,34 @@ void update() {
 
 	
 }
+/*
+const int worldWidth = 5;
+const int worldHeight = 5;
+const int worldScale = 10;
+const float worldxPos = 40;
+const float worldyPos = 20;
+SDL_Rect world[worldWidth][worldHeight];
+*/
+
+//world's cells outline RGB
+int wCol[3] = { 255, 50, 50 };
+int w2Col[3] = { 200, 200, 10 };
+void drawWorld() {
+	//assuming its filled, will get nullptr err without init the world[][]
+	int px = PlayerRect.x, py = PlayerRect.y;
+	int pw = PlayerRect.w, ph = PlayerRect.h;
+	for (int i = 0; i < worldWidth; i++) {
+		for (int j = 0; j < worldHeight; j++) {
+			if (px < worldxPos+(i+1.5)*worldScale && (double)px+(double)pw > worldxPos+(i-0.5)*worldScale
+			 && py < worldyPos+(j+1.5)*worldScale && (double)py+(double)ph > worldyPos+(j-0.5)*worldScale)
+				SDL_SetRenderDrawColor(renderer, w2Col[0], w2Col[1], w2Col[2], 255);
+			else
+				SDL_SetRenderDrawColor(renderer, wCol[0], wCol[1], wCol[2], 255);
+			
+			SDL_RenderDrawRect(renderer, &world[i][j]);
+		}
+	}
+}
 
 void draw() {
 	//Fill the surface white
@@ -211,6 +249,8 @@ void draw() {
 
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(renderer);
+
+	drawWorld();
 
 	SDL_Rect rect;
 	rect.x = 250;
@@ -264,6 +304,24 @@ int main(int argc, char* args[]) {
 		PlayerRect.w = 30;
 		PlayerRect.h = 50;
 		
+		//init world
+		for (int i = 0; i < worldWidth; i++) {
+			for (int j = 0; j < worldHeight; j++) {
+				world[i][j].x = worldxPos + (i * worldScale); // - i);
+				world[i][j].y = worldyPos + (j * worldScale); // -j);
+				world[i][j].w = worldScale;
+				world[i][j].h = worldScale;
+
+			}
+		}
+		/*
+		const int worldWidth = 5;
+		const int worldHeight = 5;
+		const int worldScale = 10;
+		const float worldxPos = 40;
+		const float worldyPos = 20;
+		SDL_Rect world[worldWidth][worldHeight];
+		*/
 
 		//Main loop flag
 		quit = false;
@@ -277,6 +335,11 @@ int main(int argc, char* args[]) {
 		//While application is running
 		while (!quit)
 		{
+			//deltaTime calculation from: https://gamedev.stackexchange.com/a/110831
+			LAST = NOW;
+			NOW = SDL_GetPerformanceCounter();
+			deltaTime = ((NOW - LAST) * 1000 / (double)SDL_GetPerformanceFrequency());
+			
 			//Handle events on queue
 			while (SDL_PollEvent(&e) != 0)
 			{
